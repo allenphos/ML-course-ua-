@@ -1,16 +1,8 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import pandas as pd
 import numpy as np
 from typing import Any, Dict, Tuple, List
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
 
 
 def split_data(
@@ -67,28 +59,37 @@ def identify_column_types(df: pd.DataFrame) -> Tuple[List[str], List[str]]:
     return numeric_cols, categorical_cols
 
 
-def create_preprocessor(numeric_cols: List[str], categorical_cols: List[str], scale_numeric: bool = True) -> ColumnTransformer:
+def encode_categorical_features(df: pd.DataFrame, categorical_cols: List[str]) -> pd.DataFrame:
     """
-    Creates a preprocessing pipeline for numerical and categorical features.
+    Encodes categorical features using OneHotEncoder.
 
     Args:
-        numeric_cols (List[str]): List of numerical feature names.
+        df (pd.DataFrame): DataFrame with categorical features.
         categorical_cols (List[str]): List of categorical feature names.
-        scale_numeric (bool): Whether to apply scaling to numerical features.
 
     Returns:
-        ColumnTransformer: Preprocessing pipeline.
+        pd.DataFrame: DataFrame with one-hot encoded categorical features.
     """
-    numeric_transformer = Pipeline(steps=[('scaler', StandardScaler())]) if scale_numeric else 'passthrough'
-    categorical_transformer = Pipeline(steps=[('onehot', OneHotEncoder(sparse_output=False, handle_unknown='ignore'))])
+    encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+    encoded_cats = encoder.fit_transform(df[categorical_cols])
+    encoded_df = pd.DataFrame(encoded_cats, columns=encoder.get_feature_names_out(categorical_cols))
+    return encoded_df, encoder
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numeric_transformer, numeric_cols),
-            ('cat', categorical_transformer, categorical_cols)
-        ]
-    )
-    return preprocessor
+
+def scale_numeric_features(df: pd.DataFrame, numeric_cols: List[str]) -> pd.DataFrame:
+    """
+    Scales numeric features using StandardScaler.
+
+    Args:
+        df (pd.DataFrame): DataFrame with numeric features.
+        numeric_cols (List[str]): List of numeric feature names.
+
+    Returns:
+        pd.DataFrame: DataFrame with scaled numeric features.
+    """
+    scaler = StandardScaler()
+    df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+    return df, scaler
 
 
 def preprocess_data(raw_df: pd.DataFrame, scale_numeric: bool = True) -> Dict[str, Any]:
@@ -109,16 +110,30 @@ def preprocess_data(raw_df: pd.DataFrame, scale_numeric: bool = True) -> Dict[st
 
     numeric_cols, categorical_cols = identify_column_types(train_inputs)
 
-    preprocessor = create_preprocessor(numeric_cols, categorical_cols, scale_numeric)
+    # Scale numeric features
+    if scale_numeric:
+        train_inputs, scaler = scale_numeric_features(train_inputs, numeric_cols)
+        val_inputs, _ = scale_numeric_features(val_inputs, numeric_cols)  # Scale validation data
+    else:
+        scaler = None
+
+    # Encode categorical features
+    encoded_train_df, encoder = encode_categorical_features(train_inputs, categorical_cols)
+    encoded_val_df = encoder.transform(val_inputs[categorical_cols])
+    encoded_val_df = pd.DataFrame(encoded_val_df, columns=encoder.get_feature_names_out(categorical_cols))
+
+    # Concatenate scaled numerical data and encoded categorical data
+    train_inputs_processed = pd.concat([train_inputs[numeric_cols].reset_index(drop=True), encoded_train_df], axis=1)
+    val_inputs_processed = pd.concat([val_inputs[numeric_cols].reset_index(drop=True), encoded_val_df], axis=1)
 
     return {
-        'X_train': train_inputs,
+        'X_train': train_inputs_processed,
         'train_targets': train_targets,
-        'X_val': val_inputs,
+        'X_val': val_inputs_processed,
         'val_targets': val_targets,
         'input_cols': input_cols,
-        'scaler': preprocessor.transformers[0][1] if scale_numeric else None,
-        'encoder': preprocessor.transformers[1][1]
+        'scaler': scaler,
+        'encoder': encoder
     }
 
 
@@ -139,11 +154,15 @@ def preprocess_new_data(new_data: pd.DataFrame, input_cols: List[str], scaler: A
 
     numeric_cols, categorical_cols = identify_column_types(new_inputs)
 
+    # Scale numeric data if scaler is provided
     if scaler:
         new_inputs[numeric_cols] = scaler.transform(new_inputs[numeric_cols])
 
+    # One-hot encode categorical data
     encoded_cats = encoder.transform(new_inputs[categorical_cols])
     encoded_df = pd.DataFrame(encoded_cats, columns=encoder.get_feature_names_out(categorical_cols))
 
     return pd.concat([new_inputs[numeric_cols].reset_index(drop=True), encoded_df], axis=1)
 
+
+    return pd.concat([new_inputs[numeric_cols].reset_index(drop=True), encoded_df], axis=1)
