@@ -164,5 +164,3 @@ def preprocess_new_data(new_data: pd.DataFrame, input_cols: List[str], scaler: A
 
     return pd.concat([new_inputs[numeric_cols].reset_index(drop=True), encoded_df], axis=1)
 
-
-    return pd.concat([new_inputs[numeric_cols].reset_index(drop=True), encoded_df], axis=1)
