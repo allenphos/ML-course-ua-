@@ -5,14 +5,23 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 
 
+from sklearn.model_selection import train_test_split
+import pandas as pd
+from typing import Tuple
+
 def split_data(
-    raw_df: pd.DataFrame, test_size: float = 0.2, val_size: float = 0.25, random_state: int = 42
+    raw_df: pd.DataFrame, 
+    target_col: str,  
+    test_size: float = 0.2, 
+    val_size: float = 0.25, 
+    random_state: int = 42
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Splits the raw dataset into training, validation, and test sets.
+    Splits the dataset into training, validation, and test sets.
 
     Args:
         raw_df (pd.DataFrame): The raw dataframe.
+        target_col (str): Name of the target column.
         test_size (float): Proportion of data to be used as the test set.
         val_size (float): Proportion of training data to be used as validation.
         random_state (int): Random seed for reproducibility.
@@ -20,13 +29,27 @@ def split_data(
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: train_df, val_df, test_df.
     """
+
+    # Check if target column exists
+    if target_col not in raw_df.columns:
+        raise ValueError(f"Target column '{target_col}' not found in dataset.")
+
+    # Stratify only if target column is categorical
+    stratify_col = raw_df[target_col] if raw_df[target_col].nunique() <= 10 else None
+
+    # First split: Train + Validation and Test
     train_val_df, test_df = train_test_split(
-        raw_df, test_size=test_size, stratify=raw_df['Exited'], random_state=random_state
+        raw_df, test_size=test_size, stratify=stratify_col, random_state=random_state
     )
+
+    # Second split: Train and Validation
+    stratify_col = train_val_df[target_col] if stratify_col is not None else None
     train_df, val_df = train_test_split(
-        train_val_df, test_size=val_size, stratify=train_val_df['Exited'], random_state=random_state
+        train_val_df, test_size=val_size, stratify=stratify_col, random_state=random_state
     )
+
     return train_df, val_df, test_df
+
 
 
 def identify_column_types(df: pd.DataFrame) -> Tuple[List[str], List[str]]:
