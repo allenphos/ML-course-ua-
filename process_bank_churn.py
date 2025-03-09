@@ -166,6 +166,7 @@ def preprocess_data(
         'encoder': encoder
     }
 
+
 def preprocess_new_data(new_data: pd.DataFrame, input_cols: List[str], scaler: Any, encoder: OneHotEncoder) -> pd.DataFrame:
     """
     Preprocesses new data using the provided scaler and encoder.
