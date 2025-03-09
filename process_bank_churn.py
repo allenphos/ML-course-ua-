@@ -3,10 +3,6 @@ import numpy as np
 from typing import Any, Dict, Tuple, List
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
-
-
-from sklearn.model_selection import train_test_split
-import pandas as pd
 from typing import Tuple
 
 def split_data(
@@ -124,7 +120,7 @@ def preprocess_data(
         raw_df = raw_df.drop(columns=drop_cols, errors="ignore")  # Avoids KeyError if column not found
 
     # Split data into train, validation, and test sets
-    train_df, val_df, test_df = split_data(raw_df)
+    train_df, val_df, test_df = split_data(raw_df, target_col) 
 
     # Dynamically select feature columns (excluding target)
     input_cols = [col for col in raw_df.columns if col != target_col]
