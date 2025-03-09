@@ -92,22 +92,37 @@ def scale_numeric_features(df: pd.DataFrame, numeric_cols: List[str]) -> pd.Data
     return df, scaler
 
 
-def preprocess_data(raw_df: pd.DataFrame, scale_numeric: bool = True) -> Dict[str, Any]:
+def preprocess_data(
+    raw_df: pd.DataFrame, 
+    target_col: str, 
+    drop_cols: List[str] = None,  
+    scale_numeric: bool = True
+) -> Dict[str, Any]: 
     """
     Preprocesses the raw dataframe.
 
     Args:
         raw_df (pd.DataFrame): The raw dataframe.
+        target_col (str): Name of the target column.
+        drop_cols (List[str], optional): List of columns to drop. Defaults to None.
         scale_numeric (bool): Whether to scale numeric features.
 
     Returns:
         Dict[str, Any]: Dictionary containing processed inputs and targets for train, val, and test sets.
     """
+    
+    # Drop specified columns if provided
+    if drop_cols:  
+        raw_df = raw_df.drop(columns=drop_cols, errors="ignore")  # Avoids KeyError if column not found
+
+    # Split data into train, validation, and test sets
     train_df, val_df, test_df = split_data(raw_df)
 
-    train_inputs, train_targets, input_cols = select_features_and_target(train_df)
-    val_inputs, val_targets, _ = select_features_and_target(val_df)
+    # Select features and target variable
+    train_inputs, train_targets, input_cols = select_features_and_target(train_df, target_col)
+    val_inputs, val_targets, _ = select_features_and_target(val_df, target_col)
 
+    # Identify numeric and categorical columns
     numeric_cols, categorical_cols = identify_column_types(train_inputs)
 
     # Scale numeric features
