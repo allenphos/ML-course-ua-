@@ -29,21 +29,6 @@ def split_data(
     return train_df, val_df, test_df
 
 
-def select_features_and_target(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
-    """
-    Selects the feature columns and target column from the dataset.
-
-    Args:
-        df (pd.DataFrame): The dataset.
-
-    Returns:
-        Tuple[pd.DataFrame, pd.Series, List[str]]: Inputs (features), target variable, list of input column names.
-    """
-    input_cols = list(df.columns)[3:-1]  # Exclude first 3 columns and target column
-    target_col = 'Exited'
-    return df[input_cols], df[target_col], input_cols
-
-
 def identify_column_types(df: pd.DataFrame) -> Tuple[List[str], List[str]]:
     """
     Identifies numeric and categorical columns in the dataset.
@@ -118,9 +103,15 @@ def preprocess_data(
     # Split data into train, validation, and test sets
     train_df, val_df, test_df = split_data(raw_df)
 
-    # Select features and target variable
-    train_inputs, train_targets, input_cols = select_features_and_target(train_df, target_col)
-    val_inputs, val_targets, _ = select_features_and_target(val_df, target_col)
+    # Dynamically select feature columns (excluding target)
+    input_cols = [col for col in raw_df.columns if col != target_col]
+    
+    # Select inputs and target variables
+    train_inputs = train_df[input_cols]
+    train_targets = train_df[target_col]
+    
+    val_inputs = val_df[input_cols]
+    val_targets = val_df[target_col]
 
     # Identify numeric and categorical columns
     numeric_cols, categorical_cols = identify_column_types(train_inputs)
@@ -137,6 +128,11 @@ def preprocess_data(
     encoded_val_df = encoder.transform(val_inputs[categorical_cols])
     encoded_val_df = pd.DataFrame(encoded_val_df, columns=encoder.get_feature_names_out(categorical_cols))
 
+    # Ensure all categorical columns exist in new data
+    missing_cols = set(encoder.get_feature_names_out(categorical_cols)) - set(encoded_val_df.columns)
+    for col in missing_cols:
+        encoded_val_df[col] = 0  # Fill missing columns with 0
+
     # Concatenate scaled numerical data and encoded categorical data
     train_inputs_processed = pd.concat([train_inputs[numeric_cols].reset_index(drop=True), encoded_train_df], axis=1)
     val_inputs_processed = pd.concat([val_inputs[numeric_cols].reset_index(drop=True), encoded_val_df], axis=1)
@@ -151,7 +147,6 @@ def preprocess_data(
         'encoder': encoder
     }
 
-
 def preprocess_new_data(new_data: pd.DataFrame, input_cols: List[str], scaler: Any, encoder: OneHotEncoder) -> pd.DataFrame:
     """
     Preprocesses new data using the provided scaler and encoder.
@@ -165,7 +160,7 @@ def preprocess_new_data(new_data: pd.DataFrame, input_cols: List[str], scaler: A
     Returns:
         pd.DataFrame: Processed new data.
     """
-    new_inputs = new_data[input_cols]
+    new_inputs = new_data[input_cols].copy()  # Ensure a copy to avoid modifying the original DataFrame
 
     numeric_cols, categorical_cols = identify_column_types(new_inputs)
 
@@ -176,6 +171,11 @@ def preprocess_new_data(new_data: pd.DataFrame, input_cols: List[str], scaler: A
     # One-hot encode categorical data
     encoded_cats = encoder.transform(new_inputs[categorical_cols])
     encoded_df = pd.DataFrame(encoded_cats, columns=encoder.get_feature_names_out(categorical_cols))
+
+    # Ensure all columns match training
+    missing_cols = set(encoder.get_feature_names_out(categorical_cols)) - set(encoded_df.columns)
+    for col in missing_cols:
+        encoded_df[col] = 0  # Fill missing columns with 0
 
     return pd.concat([new_inputs[numeric_cols].reset_index(drop=True), encoded_df], axis=1)
 
